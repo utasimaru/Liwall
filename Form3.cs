@@ -28,6 +28,7 @@ namespace Liwall
             }, IntPtr.Zero);
 
             dc_workerw = User32.GetDCEx(handle_workerw, IntPtr.Zero, 0x403);
+            this.pictureBox1.Location = new System.Drawing.Point((Screen.PrimaryScreen.Bounds.Width-800)/2,100);
             BackColor = Color.FromArgb(178, 178, 178);
             Program.drawing = true;
             DrawLoop2();
@@ -91,7 +92,7 @@ namespace Liwall
                 bitmap = ImageToBytes.LoadRainyBootsAnime2();
                 pictureBox1.Image = bitmap[1];
 
-                int framerate = 1000 / 20;
+                int framerate = 1000 / 10;
                 //int tick, timeToNext = 0;
                 int w = Screen.PrimaryScreen.Bounds.Width;
                 int h = Screen.PrimaryScreen.Bounds.Height;
