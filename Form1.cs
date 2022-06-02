@@ -1,85 +1,173 @@
 ﻿using System;
 using System.Drawing;
-using System.Runtime.InteropServices;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Liwall
 {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct PAINTSTRUCT
-    {
-        public IntPtr hdc;
-        public bool fErase;
-        public RECT rcPaint;
-        public bool fRestore;
-        public bool fIncUpdate;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-        public byte[] rgbReserved;
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT
-    {
-        public int left;
-        public int top;
-        public int right;
-        public int bottom;
-    }
-
     public partial class Form1 : Form
     {
-
-        public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-        [DllImport("user32.dll")]
-        public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetDCEx(IntPtr hWnd, IntPtr hrgnClip, uint flags);
-        [DllImport("user32.dll")]
-        public static extern IntPtr ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-        [DllImport("gdi32.dll")]
-        public static extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject);
-        [DllImport("gdi32.dll")]
-        public static extern bool BitBlt(IntPtr hObject, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hObjectSource, int nXSrc, int nYSrc, int dwRop);
-
-        [DllImport("gdi32.dll")]
-        public static extern bool DeleteDC(IntPtr hDC);
-        [DllImport("gdi32.dll")]
-        public static extern IntPtr CreateCompatibleDC(IntPtr hDC);
-
-
+        IntPtr handle_wall;
+        IntPtr dc_wall;
+        IntPtr dc_canvas;
         public Form1()
         {
             InitializeComponent();
-            for (int ix = 0; ix < 1920; ix++)
+            handle_wall = IntPtr.Zero;
+            User32.EnumWindows((hwnd, lParam) =>
             {
-                for (int iy = 0; iy < 1080; iy++)
-                {
-                    int c = (int)((ix + iy) * 255 / (1920 + 1080));
-                    bitmap.SetPixel(ix, iy, Color.FromArgb(c, c, c));
-                }
-            }
-        }
-        Bitmap bitmap = new Bitmap(1920, 1080);
-        private void button1_Click(object sender, EventArgs e)
-        {
-            IntPtr handle_wall = IntPtr.Zero;
-            EnumWindows((hwnd, lParam) =>
-            {
-                IntPtr shell = FindWindowEx(hwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
-                if (shell != IntPtr.Zero) handle_wall = FindWindowEx(IntPtr.Zero, hwnd, "WorkerW", null);
+                IntPtr shell = User32.FindWindowEx(hwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
+                if (shell != IntPtr.Zero) handle_wall = User32.FindWindowEx(IntPtr.Zero, hwnd, "WorkerW", null);
                 return true;
             }, IntPtr.Zero);
 
-            IntPtr dc_wall = GetDCEx(handle_wall, IntPtr.Zero, 0x403);
-            IntPtr dc_canvas = CreateCompatibleDC(dc_wall);
-            SelectObject(dc_canvas, bitmap.GetHbitmap());
-            BitBlt(dc_wall, 0, 0, bitmap.Width, bitmap.Height, dc_canvas, 0, 0, 0x00CC0020);
+            dc_wall = User32.GetDCEx(handle_wall, IntPtr.Zero, 0x403);
+            dc_canvas = GDI32.CreateCompatibleDC(dc_wall);
+        }
+        private void button3_Click(object sender, EventArgs e)
+        {
+            if (!Program.drawing)
+            {
+                Program.drawing = true;
+                DrawLoop();
+            }
+        }
+        //安定
+        private void DrawLoop()
+        {
+            Task.Run(() =>
+            {
+                Bitmap[] _animes = ImageToBytes.LoadRainyBootsAnime2();
+                IntPtr[] hb_animes = new IntPtr[6];
+                Color wh = Color.FromArgb(178, 178, 178);
+                Bitmap _back = new Bitmap(1920, 1080);
+                for (int ix = 0; ix < _back.Width; ix++)
+                {
+                    for (int iy = 0; iy < _back.Height; iy++)
+                    {
+                        _back.SetPixel(ix, iy, wh);
+                    }
+                }
+                IntPtr hb_back = _back.GetHbitmap();
+                IntPtr dc_back= GDI32.CreateCompatibleDC(dc_wall);
+                GDI32.SelectObject(dc_back, hb_back);
 
-            DeleteDC(dc_canvas);
-            ReleaseDC(handle_wall, dc_wall);
+                for (int i = 0; i < 6; i++) hb_animes[i] = _animes[i].GetHbitmap();
+                int framerate = 1000 / 10;
+                int tick, timeToNext,animeIndex=0;
+                while (Program.drawing)
+                {
+                    tick=Environment.TickCount;
+                    GDI32.SelectObject(dc_canvas, hb_animes[animeIndex]);
+                    animeIndex=animeIndex>=5?0:animeIndex+1;
+                    
+                    GDI32.BitBlt(dc_wall, 0, 0, 1920, 1080, dc_back, 0, 0, 0x00CC0020);
+                    GDI32.BitBlt(dc_wall, 0, 0, 800, 800, dc_canvas, 0, 0, 0x00CC0020);
+
+                    timeToNext = Environment.TickCount + framerate - tick; ;
+                    if (timeToNext>0)Thread.Sleep(timeToNext);
+                }
+                GDI32.DeleteDC(dc_canvas);
+                User32.ReleaseDC(handle_wall, dc_wall);
+            });
+        }
+        //メモリ削減案1。遅いしメモリも食う。
+        /*
+        private void DrawLoop2()
+        {
+            Task.Run(() =>
+            {
+                IntPtr hbitmap = new IntPtr();
+                Bitmap bitmap = new Bitmap(800, 800);
+                Color wh = Color.FromArgb(255, 178, 178, 178);
+                Color bl = Color.FromArgb(255, 9, 9, 9);
+
+                int framerate = 1000 / 10;
+                int tick, timeToNext, animeIndex = 0;
+
+                BinaryReader br = new BinaryReader(new FileStream(Directory.GetCurrentDirectory() + "/image/ImageBin.bin", FileMode.Open));
+                while (drawing)
+                {
+                    tick = Environment.TickCount;
+                    animeIndex = animeIndex >= 5 ? 0 : animeIndex + 1;
+
+                    br.BaseStream.Position = animeIndex * 640000;
+                    for (int i = 0; i < 640000; i++)
+                    {
+                        if (br.Read() > 0) bitmap.SetPixel(i % 800, i / 800, wh);
+                        else bitmap.SetPixel(i % 800, i / 800, bl);
+                    }
+
+                    hbitmap = bitmap.GetHbitmap();
+                    GDI32.SelectObject(dc_canvas, hbitmap);
+                    GDI32.BitBlt(dc_wall, 0, 0, 800, 800, dc_canvas, 0, 0, 0x00CC0020);
+
+                    timeToNext = Environment.TickCount + framerate - tick; ;
+                    if (timeToNext > 0) Thread.Sleep(timeToNext);
+                }
+                br.Close();
+                GDI32.DeleteDC(dc_canvas);
+                User32.ReleaseDC(handle_wall, dc_wall);
+            });
+        }*/
+        private void DrawLoop3()
+        {
+            Task.Run(() =>
+            {
+                IntPtr hbitmap = new IntPtr();
+                PixelFormat format = PixelFormat.Format32bppRgb;
+                Bitmap[] bitmap = new Bitmap[2];
+                bitmap[0] = new Bitmap(800, 800,format);
+                bitmap[1] = new Bitmap(800, 800, format);
+                int wh = 178 << 16 | 178 << 8 | 178;
+                int bl = 9 << 16 | 9 << 8 | 9;
+
+                int framerate = 1000 / 10;
+                int tick, timeToNext, animeIndex = 0;
+
+                hbitmap = bitmap[1].GetHbitmap();
+                GDI32.SelectObject(dc_canvas, hbitmap);
+                GDI32.BitBlt(dc_wall, 0, 0, 800, 800, dc_canvas, 0, 0, 0x00CC0020);
+
+                BinaryReader br = new BinaryReader(new FileStream(Directory.GetCurrentDirectory() + "/image/ImageBin.bin", FileMode.Open));
+                while (Program.drawing)
+                {
+                    int ib = animeIndex % 2;
+                    tick = Environment.TickCount;
+                    //////////////
+                    BitmapData bitmapdata = bitmap[ib].LockBits(new Rectangle(0, 0, 800, 800), ImageLockMode.WriteOnly, format);
+                    IntPtr ptr = bitmapdata.Scan0;
+
+                    br.BaseStream.Position = animeIndex * 640000;
+                    unsafe
+                    {
+                        int* dst = (int*)ptr.ToPointer();
+                        for (int i = 0; i < 640000; i++)
+                        {
+                            if (br.Read() > 0) *dst++ = wh;
+                            else *dst++ = bl;
+                        }
+                    }
+                    bitmap[ib].UnlockBits(bitmapdata);
+                    //hbitmap = bitmap[ib].GetHbitmap();
+                    GDI32.SelectObject(dc_canvas, hbitmap);
+                    GDI32.BitBlt(dc_wall, 0, 0, 800, 800, dc_canvas, 0, 0, 0x00CC0020);
+                    animeIndex = animeIndex >= 5 ? 0 : animeIndex + 1;
+
+                    timeToNext = Environment.TickCount + framerate - tick;
+                    if (timeToNext > 0) Thread.Sleep(timeToNext);
+                }
+                br.Close();
+                GDI32.DeleteDC(dc_canvas);
+                User32.ReleaseDC(handle_wall, dc_wall);
+            });
+        }
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            Program.drawing = false;
         }
     }
 }
