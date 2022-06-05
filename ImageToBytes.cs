@@ -22,7 +22,7 @@ namespace Liwall
             }
             bw.Close();
         }
-        public static Bitmap[] LoadRainyBootsAnime2()
+        public static Bitmap[] LoadRainyBootsAnime()
         {
             int wh = 178 << 16 | 178 << 8 | 178;
             int bl = 9 << 16 | 9 << 8 | 9;
@@ -48,25 +48,6 @@ namespace Liwall
                     }
                 }
                 res[i].UnlockBits(bitmapdata);
-            }
-            br.Close();
-            return res;
-        }
-        public static Bitmap[] LoadRainyBootsAnime(string folderPath)
-        {
-            Bitmap[] res = new Bitmap[6];
-            BinaryReader br = new BinaryReader(new FileStream(folderPath + "/ImageBin.bin", FileMode.Open));
-            Color wh = Color.FromArgb(255, 178, 178, 178);
-            Color bl = Color.FromArgb(255, 9, 9, 9);
-            for(int iimg = 0; iimg < 6; iimg++)
-            {
-                Bitmap bitmap = new Bitmap(800, 800);
-                for (int i = 0; i < 640000; i++)
-                {
-                    if (br.Read() > 0) bitmap.SetPixel(i % 800, i / 800, wh);
-                    else bitmap.SetPixel(i % 800, i / 800, bl);
-                }
-                res[iimg] = bitmap;
             }
             br.Close();
             return res;

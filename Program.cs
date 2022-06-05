@@ -9,6 +9,7 @@ namespace Liwall
         /// アプリケーションのメイン エントリ ポイントです。
         /// </summary>
         public static bool drawing = false;
+        public static int framerate = 100;
         [STAThread]
         static void Main()
         {

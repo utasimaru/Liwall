@@ -40,7 +40,7 @@ namespace Liwall
         {
             Task.Run(() =>
             {
-                Bitmap[] _animes = ImageToBytes.LoadRainyBootsAnime2();
+                Bitmap[] _animes = ImageToBytes.LoadRainyBootsAnime();
                 IntPtr[] hb_animes = new IntPtr[6];
                 Color wh = Color.FromArgb(178, 178, 178);
                 Bitmap _back = new Bitmap(1920, 1080);
